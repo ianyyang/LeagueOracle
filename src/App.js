@@ -75,22 +75,11 @@ class App extends Component {
 
     render() {
         return (
-            <div className="container">
-                <div className="row">
-                    <div className="col-md-6">
-                        <form method="post" action="#" id="#">
-                            <div className="form-group files">
-                                <label>Upload Your File </label>
-                                <br />
-                                <input type="file" name="file" onChange={this.chooseFileOnChangeHandler} />
-                                <br />
-                                <button type="button" className="btn btn-success btn-block" onClick={this.uploadFileOnClickHandler}>
-                                    Upload
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
+            <div>
+                <form action="#" method="POST" enctype="multipart/form-data">
+                    <input type="file" name="file" onChange={this.chooseFileOnChangeHandler} />
+                    <button type="button" onClick={this.uploadFileOnClickHandler}>Upload</button>
+                </form>
             </div>
         )
     }
