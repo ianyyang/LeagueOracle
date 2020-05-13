@@ -6,7 +6,9 @@ var imageSchema = new Schema({
     originalName: String,
     modifiedName: String,
     type: String,
-    size: String,
+    size: Number,
+    width: Number,
+    height: Number,
     data: Buffer
 }, {
     timestamps: true,

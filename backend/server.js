@@ -5,6 +5,9 @@ var cors = require('cors');
 var mongoose = require('mongoose');
 var multer = require('multer');
 var fs = require('fs');
+var sizeOf = require('image-size');
+var jimp = require('jimp');
+var tesseract = require('tesseract.js');
 
 // Declarations
 var app = express();
@@ -40,33 +43,64 @@ app.get('/', (req, res) => {
     return res.send('Hello');
 });
 
-// POST: upload image to Multer storage
+// GET: specific query (todo)
+app.get('/:id', (req, res) => {
+    return res.send('Hello');
+});
+
+// POST: Process image then store image, image data, and Tesseract.js results in database (in prog)
 app.post('/upload', (req, res) => {
+    // Upload to Multer storage
     upload(req, res, (err) => {
+        // Image pre-processing via Jimp (todo: 10 crops, 1/player)
+        jimp.read(`./uploads/${req.file.filename}`)
+            .then((upload) => {
+                upload
+                    .greyscale()
+                    .contrast(+1)
+                    .normalize()
+                    .invert()
+                    .write(`./uploads/${req.file.filename}`);
+            })
+            .catch((err) => {
+                console.error(err);
+            });
+
+        // Tesseract.js image processing
+        tesseract.recognize(`./uploads/${req.file.filename}`)
+            .then(({ data: { text } }) => {
+                console.log(text);
+            })
+            .catch((err) => {
+                console.error(err);
+            })
+
+        // Set up Mongoose image schema
         var image = fs.readFileSync(req.file.path);
         var encode_image = image.toString('base64');
+        var dimensions = sizeOf(`./uploads/${req.file.filename}`);
         var newImage = new Image({
             originalName: req.file.originalname,
             modifiedName: req.file.filename,
             type: req.file.mimetype,
             size: req.file.size,
+            width: dimensions.width,
+            height: dimensions.height,
             data: new Buffer.from(encode_image, 'base64')
         });
 
+        // Save Mongoose image schema to database
         newImage.save()
             .then(() => {
-                console.log('Image added to the MongoDB database!');
                 res.send('Image added to the MongoDB database!');
             })
-
-        fs.readFile(`./uploads/${req.file.originalname}`, (err, data) => {
-            if (err) {
-                return res.status(500).json(err);
-            }
-        })
+            .catch(err => {
+                console.error(err);
+            })
     })
 })
 
+// Server start
 app.listen(PORT, function () {
-    console.log(`App running on port ${PORT}`)
+    console.log(`League Oracle running on port ${PORT}`)
 });
