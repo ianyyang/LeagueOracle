@@ -52,6 +52,9 @@ app.get('/:id', (req, res) => {
 app.post('/upload', (req, res) => {
     // Upload to Multer storage
     upload(req, res, (err) => {
+        // Setting up Tesseract.js data
+        var raw = [];
+
         // Setting up crop parameters
         var dimensions = sizeOf(`./uploads/${req.file.filename}`);
         var crop_x = [dimensions.width * 0.133333];
@@ -72,7 +75,6 @@ app.post('/upload', (req, res) => {
                     .normalize()
                     .invert()
                     .write(`./uploads/processing/processed ${req.file.filename}`);
-                console.log('Image pre-processing complete')
             })
             .then(() => {
                 for (let i = 0; i < crop_y.length; i++) {
@@ -88,21 +90,21 @@ app.post('/upload', (req, res) => {
                             });
                     }
                 }
-
-                console.log('Image cropping complete');
+            })
+            .then(() => {
+                // Tesseract.js image processing
+                tesseract.recognize(`./uploads/processing/crop 0 ${req.file.filename}`)
+                    .then(({ data: { text } }) => {
+                        raw.push(text)
+                        console.log(raw)
+                    })
+                    .catch((err) => {
+                        console.error(err)
+                    })
             })
             .catch((err) => {
                 console.log(err);
             })
-
-        // // Tesseract.js image processing
-        // tesseract.recognize(`./uploads/processing/processed ${req.file.filename}`)
-        //     .then(({ data: { text } }) => {
-        //         console.log(text);
-        //     })
-        //     .catch((err) => {
-        //         console.error(err);
-        //     })
 
         // // Set up Mongoose image schema
         // var image = fs.readFileSync(req.file.path);
@@ -121,7 +123,6 @@ app.post('/upload', (req, res) => {
         // newImage.save()
         //     .then(() => {
         //         res.send('Image added to the database');
-        //         console.log('Image added to the database');
         //     })
         //     .catch(err => {
         //         console.error(err);
