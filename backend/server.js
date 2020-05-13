@@ -48,11 +48,22 @@ app.get('/:id', (req, res) => {
     return res.send('Hello');
 });
 
-// POST: Process image then store image, image data, and Tesseract.js results in database (in prog)
+// POST: Process image then store image, image data, and Tesseract.js results in database
 app.post('/upload', (req, res) => {
     // Upload to Multer storage
     upload(req, res, (err) => {
-        // Image pre-processing via Jimp (todo: 10 crops, 1/player)
+        // Setting up crop parameters
+        var dimensions = sizeOf(`./uploads/${req.file.filename}`);
+        var crop_x = [dimensions.width * 0.133333];
+        var crop_y = [dimensions.height * 0.364815, dimensions.height * 0.864815];
+        var crop_w = dimensions.width * 0.133333;
+        var crop_h = dimensions.height * 0.112963;
+        for (let i = 0; i < 4; i++) {
+            crop_x.push(crop_x[crop_x.length - 1] + (dimensions.width * 0.150000));
+
+        }
+
+        // Image pre-processing via Jimp
         jimp.read(`./uploads/${req.file.filename}`)
             .then((upload) => {
                 upload
@@ -60,43 +71,61 @@ app.post('/upload', (req, res) => {
                     .contrast(+1)
                     .normalize()
                     .invert()
-                    .write(`./uploads/${req.file.filename}`);
+                    .write(`./uploads/processing/processed ${req.file.filename}`);
+                console.log('Image pre-processing complete')
             })
-            .catch((err) => {
-                console.error(err);
-            });
-
-        // Tesseract.js image processing
-        tesseract.recognize(`./uploads/${req.file.filename}`)
-            .then(({ data: { text } }) => {
-                console.log(text);
-            })
-            .catch((err) => {
-                console.error(err);
-            })
-
-        // Set up Mongoose image schema
-        var image = fs.readFileSync(req.file.path);
-        var encode_image = image.toString('base64');
-        var dimensions = sizeOf(`./uploads/${req.file.filename}`);
-        var newImage = new Image({
-            originalName: req.file.originalname,
-            modifiedName: req.file.filename,
-            type: req.file.mimetype,
-            size: req.file.size,
-            width: dimensions.width,
-            height: dimensions.height,
-            data: new Buffer.from(encode_image, 'base64')
-        });
-
-        // Save Mongoose image schema to database
-        newImage.save()
             .then(() => {
-                res.send('Image added to the MongoDB database!');
+                for (let i = 0; i < crop_y.length; i++) {
+                    for (let j = 0; j < crop_x.length; j++) {
+                        jimp.read(`./uploads/processing/processed ${req.file.filename}`)
+                            .then((upload) => {
+                                upload
+                                    .crop(crop_x[j], crop_y[i], crop_w, crop_h)
+                                    .write(`./uploads/processing/crop ${5 * i + j} ${req.file.filename}`)
+                            })
+                            .catch((err) => {
+                                console.error(err);
+                            });
+                    }
+                }
+
+                console.log('Image cropping complete');
             })
-            .catch(err => {
-                console.error(err);
+            .catch((err) => {
+                console.log(err);
             })
+
+        // // Tesseract.js image processing
+        // tesseract.recognize(`./uploads/processing/processed ${req.file.filename}`)
+        //     .then(({ data: { text } }) => {
+        //         console.log(text);
+        //     })
+        //     .catch((err) => {
+        //         console.error(err);
+        //     })
+
+        // // Set up Mongoose image schema
+        // var image = fs.readFileSync(req.file.path);
+        // var encode_image = image.toString('base64');
+        // var newImage = new Image({
+        //     originalName: req.file.originalname,
+        //     modifiedName: req.file.filename,
+        //     type: req.file.mimetype,
+        //     size: req.file.size,
+        //     width: dimensions.width,
+        //     height: dimensions.height,
+        //     data: new Buffer.from(encode_image, 'base64')
+        // });
+
+        // // Save Mongoose image schema to database
+        // newImage.save()
+        //     .then(() => {
+        //         res.send('Image added to the database');
+        //         console.log('Image added to the database');
+        //     })
+        //     .catch(err => {
+        //         console.error(err);
+        //     })
     })
 })
 
