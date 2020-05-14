@@ -57,54 +57,40 @@ app.post('/upload', (req, res) => {
 
         // Setting up crop parameters
         var dimensions = sizeOf(`./uploads/${req.file.filename}`);
-        var crop_x = [dimensions.width * 0.133333];
-        var crop_y = [dimensions.height * 0.364815, dimensions.height * 0.864815];
-        var crop_w = dimensions.width * 0.133333;
-        var crop_h = dimensions.height * 0.112963;
-        for (let i = 0; i < 4; i++) {
-            crop_x.push(crop_x[crop_x.length - 1] + (dimensions.width * 0.150000));
+        var crop_w = dimensions.width * (0.133333 * 5 + 0.016667 * 4);
+        var crop_h = dimensions.height * 0.036111;
+        var crop_x = dimensions.width * 0.133333;
+        var crop_y = [dimensions.height * 0.364815, dimensions.height * (0.364815 + 0.082407),
+        dimensions.height * (0.364815 + 0.500000), dimensions.height * (0.364815 + 0.500000 + 0.082407)];
 
+        // Process Image: Pre-process, crop, and compose
+        async function processImage() {
+            await editImage(`./uploads/${req.file.filename}`);
+
+            await Promise.all(crop_y.map((y, i) => {
+                cropImage('./uploads/processing/composite.png', i + 1, crop_x, y, crop_w, crop_h);
+            }));
+
+            for (let i = 0; i < crop_y.length; i++) {
+                await composeImage('./uploads/processing/composite.png', `./uploads/processing/crop ${i + 1}.png`, 0, i * crop_h, i);
+            };
+
+            await cropImage('./uploads/processing/composite.png', '', 0, 0, crop_w, crop_h * 4);
         }
 
-        // Image pre-processing via Jimp
-        jimp.read(`./uploads/${req.file.filename}`)
-            .then((upload) => {
-                upload
-                    .greyscale()
-                    .contrast(+1)
-                    .normalize()
-                    .invert()
-                    .write(`./uploads/processing/processed ${req.file.filename}`);
-            })
-            .then(() => {
-                for (let i = 0; i < crop_y.length; i++) {
-                    for (let j = 0; j < crop_x.length; j++) {
-                        jimp.read(`./uploads/processing/processed ${req.file.filename}`)
-                            .then((upload) => {
-                                upload
-                                    .crop(crop_x[j], crop_y[i], crop_w, crop_h)
-                                    .write(`./uploads/processing/crop ${5 * i + j} ${req.file.filename}`)
-                            })
-                            .catch((err) => {
-                                console.error(err);
-                            });
-                    }
-                }
-            })
-            .then(() => {
-                // Tesseract.js image processing
-                tesseract.recognize(`./uploads/processing/crop 0 ${req.file.filename}`)
-                    .then(({ data: { text } }) => {
-                        raw.push(text)
-                        console.log(raw)
-                    })
-                    .catch((err) => {
-                        console.error(err)
-                    })
-            })
-            .catch((err) => {
-                console.log(err);
-            })
+        processImage();
+
+        // // Tesseract.js image processing
+        // for (let i = 0; i < crop_y.length; i++) {
+        //     tesseract.recognize(`./uploads/processing/crop ${i} ${req.file.filename}`)
+        //         .then(({ data: { text } }) => {
+        //             raw.push(text)
+        //             console.log(raw)
+        //         })
+        //         .catch((err) => {
+        //             console.error(err)
+        //         })
+        // }
 
         // // Set up Mongoose image schema
         // var image = fs.readFileSync(req.file.path);
@@ -129,6 +115,37 @@ app.post('/upload', (req, res) => {
         //     })
     })
 })
+
+// Image editing via Jimp
+async function editImage(img) {
+    const image = await jimp.read(img);
+    image.greyscale().contrast(+1).normalize().invert();
+
+    const processed = image.writeAsync('./uploads/processing/processed.png');
+    const composite = image.writeAsync('./uploads/processing/composite.png');
+    await processed;
+    await composite;
+    console.log('Image editing completed');
+}
+
+// Image cropping via Jimp
+async function cropImage(img, i, x, y, w, h) {
+    const image = await jimp.read(img);
+    image.crop(x, y, w, h);
+
+    await image.writeAsync(`./uploads/processing/crop ${i}.png`);
+    console.log('Image cropping completed');
+}
+
+// Image composition via Jimp
+async function composeImage(img1, img2, x, y, i) {
+    const image1 = await jimp.read(img1);
+    const image2 = await jimp.read(img2);
+    image1.composite(image2, x, y);
+
+    await image1.writeAsync(img1);
+    console.log('Image composition completed');
+}
 
 // Server start
 app.listen(PORT, function () {
