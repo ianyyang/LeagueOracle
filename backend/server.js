@@ -30,13 +30,13 @@ var storage = multer.diskStorage({
 var upload = multer({ storage: storage }).single('file');
 
 // MongoDB Atlas & Mongoose
-var Image = require('./models/image.model');
-var uri = process.env.ATLAS_URI;
-mongoose.connect(uri, { useNewUrlParser: true, useCreateIndex: true, useUnifiedTopology: true });
-var connection = mongoose.connection;
-connection.once('open', () => {
-    console.log("MongoDB database connection established successfully");
-})
+// var Image = require('./models/image.model');
+// var uri = process.env.ATLAS_URI;
+// mongoose.connect(uri, { useNewUrlParser: true, useCreateIndex: true, useUnifiedTopology: true });
+// var connection = mongoose.connection;
+// connection.once('open', () => {
+//     console.log("MongoDB database connection established successfully");
+// })
 
 // GET: all previous queries (todo)
 app.get('/', (req, res) => {
@@ -55,27 +55,48 @@ app.post('/upload', (req, res) => {
         // Setting up Tesseract.js data
         var raw = [];
 
-        // Setting up crop parameters
+        // Setting up crop parameters (See: Prototype Reference)
         var dimensions = sizeOf(`./uploads/${req.file.filename}`);
-        var crop_w = dimensions.width * (0.133333 * 5 + 0.016667 * 4);
-        var crop_h = dimensions.height * 0.036111;
-        var crop_x = dimensions.width * 0.133333;
-        var crop_y = [dimensions.height * 0.364815, dimensions.height * (0.364815 + 0.082407),
-        dimensions.height * (0.364815 + 0.500000), dimensions.height * (0.364815 + 0.500000 + 0.082407)];
+        // Width: champion/player name
+        var crop_w = dimensions.width * 0.125521;
+        // Height: champion and player name
+        var crop_h = [];
+        for (let i = 0; i < 10; i++) {
+            crop_h.push(dimensions.height * 0.023148, dimensions.height * 0.020370);
+        };
+        // X: two rows of five champion and player name pairs
+        var crop_x = [dimensions.width * 0.138021, dimensions.width * 0.138021];
+        for (let i = 0; i < 4; i++) {
+            crop_x.push(crop_x[crop_x.length - 1] + (dimensions.width * 0.150000),
+                crop_x[crop_x.length - 1] + (dimensions.width * 0.150000));
+        }
+        for (let i = 0; i < 5; i++) {
+            crop_x.push(crop_x[i * 2], crop_x[i * 2]);
+        }
+        // Y: one column of one champion and player name pairs
+        var crop_y = [dimensions.height * 0.375926, dimensions.height * (0.375926 + 0.073148)];
+        for (let i = 0; i < 4; i++) {
+            crop_y.push(crop_y[0], crop_y[1]);
+        }
+        for (let i = 0; i < 5; i++) {
+            crop_y.push(crop_y[0] + (dimensions.height * 0.499074), crop_y[1] + (dimensions.height * 0.499074));
+        }
 
         // Process Image: Pre-process, crop, and compose
         async function processImage() {
             await editImage(`./uploads/${req.file.filename}`);
 
-            await Promise.all(crop_y.map((y, i) => {
-                cropImage('./uploads/processing/composite.png', i + 1, crop_x, y, crop_w, crop_h);
-            }));
-
-            for (let i = 0; i < crop_y.length; i++) {
-                await composeImage('./uploads/processing/composite.png', `./uploads/processing/crop ${i + 1}.png`, 0, i * crop_h, i);
+            for (let i = 0; i < crop_x.length; i++) {
+                await cropImage('./uploads/processing/composite.png', i + 1, crop_x[i], crop_y[i], crop_w, crop_h[i]);
             };
 
-            await cropImage('./uploads/processing/composite.png', '', 0, 0, crop_w, crop_h * 4);
+            var height = 0;
+            for (let i = 0; i < crop_x.length; i++) {
+                await composeImage('./uploads/processing/composite.png', `./uploads/processing/crop ${i + 1}.png`, 0, height);
+                height += crop_h[i];
+            };
+
+            await cropImage('./uploads/processing/composite.png', '', 0, 0, crop_w, (crop_h[0] * 10) + (crop_h[1] * 10));
         }
 
         processImage();
@@ -119,7 +140,7 @@ app.post('/upload', (req, res) => {
 // Image editing via Jimp
 async function editImage(img) {
     const image = await jimp.read(img);
-    image.greyscale().contrast(+1).normalize().invert();
+    image.greyscale().contrast(+0.15).normalize().invert();
 
     const processed = image.writeAsync('./uploads/processing/processed.png');
     const composite = image.writeAsync('./uploads/processing/composite.png');
@@ -138,7 +159,7 @@ async function cropImage(img, i, x, y, w, h) {
 }
 
 // Image composition via Jimp
-async function composeImage(img1, img2, x, y, i) {
+async function composeImage(img1, img2, x, y) {
     const image1 = await jimp.read(img1);
     const image2 = await jimp.read(img2);
     image1.composite(image2, x, y);
