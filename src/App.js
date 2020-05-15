@@ -10,7 +10,8 @@ class App extends Component {
             maxSize: 5000000,
             validTypes: ['image/png', 'image/jpeg', 'image/jpg'],
             selectedFile: null,
-            loaded: 0
+            loaded: 0,
+            data: ''
         }
     }
 
@@ -70,7 +71,7 @@ class App extends Component {
         const data = new FormData()
         data.append('file', this.state.selectedFile)
         axios.post("http://localhost:5000/upload", data)
-            .then(res => { console.log(res.statusText) })
+            .then(res => { this.setState({ data: res }) })
     }
 
     render() {

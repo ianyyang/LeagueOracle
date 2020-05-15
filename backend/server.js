@@ -7,7 +7,7 @@ var multer = require('multer');
 var fs = require('fs');
 var sizeOf = require('image-size');
 var jimp = require('jimp');
-var tesseract = require('tesseract.js');
+var { createWorker } = require('tesseract.js');
 
 // Declarations
 var app = express();
@@ -82,7 +82,7 @@ app.post('/upload', (req, res) => {
             crop_y.push(crop_y[0] + (dimensions.height * 0.499074), crop_y[1] + (dimensions.height * 0.499074));
         }
 
-        // Process Image: Pre-process, crop, and compose
+        // Process Image: Edit, crop, compose, and Tesseract.js the image
         async function processImage() {
             await editImage(`./uploads/${req.file.filename}`);
 
@@ -97,21 +97,13 @@ app.post('/upload', (req, res) => {
             };
 
             await cropImage('./uploads/processing/composite.png', '', 0, 0, crop_w, (crop_h[0] * 10) + (crop_h[1] * 10));
+
+            await recognizeImage('./uploads/processing/crop .png', raw);
         }
 
         processImage();
 
-        // // Tesseract.js image processing
-        // for (let i = 0; i < crop_y.length; i++) {
-        //     tesseract.recognize(`./uploads/processing/crop ${i} ${req.file.filename}`)
-        //         .then(({ data: { text } }) => {
-        //             raw.push(text)
-        //             console.log(raw)
-        //         })
-        //         .catch((err) => {
-        //             console.error(err)
-        //         })
-        // }
+        res.send(raw);
 
         // // Set up Mongoose image schema
         // var image = fs.readFileSync(req.file.path);
@@ -166,6 +158,20 @@ async function composeImage(img1, img2, x, y) {
 
     await image1.writeAsync(img1);
     console.log('Image composition completed');
+}
+
+// Tesseract.js image processing
+async function recognizeImage(img, data) {
+    const worker = createWorker();
+    await worker.load();
+    await worker.loadLanguage('eng');
+    await worker.initialize('eng');
+
+    const { data: { text } } = await worker.recognize(img);
+    data.push(text);
+    console.log(text);
+
+    await worker.terminate();
 }
 
 // Server start
