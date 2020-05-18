@@ -11,7 +11,13 @@ class App extends Component {
             validTypes: ['image/png', 'image/jpeg', 'image/jpg'],
             selectedFile: null,
             loaded: 0,
-            data: ''
+            data: '',
+            teamID: '',
+            imageID: '',
+            teams: [],
+            images: [],
+            team: [],
+            image: []
         }
     }
 
@@ -74,12 +80,60 @@ class App extends Component {
             .then(res => { this.setState({ data: res }) })
     }
 
+    // onClick handler for all teams button
+    allTeamsOnClickHandler = (event) => {
+        axios.post("http://localhost:5000/teams")
+            .then(res => { this.setState({ teams: res }) })
+    }
+
+    // onClick handler for all images button
+    allImagesOnClickHandler = (event) => {
+        axios.get("http://localhost:5000/images")
+            .then(res => { this.setState({ images: res }) })
+    }
+
+    // onClick handler for specific team button
+    idTeamsOnClickHandler = (event) => {
+        axios.post("http://localhost:5000/teams/", { _id: this.state.teamID })
+            .then(res => { this.setState({ team: res }) })
+    }
+
+    // onClick handler for specific image button
+    idImagesOnClickHandler = (event) => {
+        axios.get("http://localhost:5000/images/", { _id: this.state.imageID })
+            .then(res => { this.setState({ image: res }) })
+    }
+
+    // onChange handler for specific team input
+    idTeamsOnChangeHandler = (event) => {
+        this.setState({ teamID: event.target.value })
+    }
+
+    // onChange handler for specific image input
+    idImagesOnChangeHandler = (event) => {
+        this.setState({ imageID: event.target.value })
+    }
+
     render() {
         return (
             <div>
                 <form action="#" method="POST" enctype="multipart/form-data">
                     <input type="file" name="file" onChange={this.chooseFileOnChangeHandler} />
                     <button type="button" onClick={this.uploadFileOnClickHandler}>Upload</button>
+                </form>
+
+                <button type="button" onClick={this.allTeamsOnClickHandler}>All Teams</button>
+                <button type="button" onClick={this.allImagesOnClickHandler}>All Images</button>
+
+                <button type="button" onClick={this.idTeamsOnClickHandler}>Team by ID</button>
+                <button type="button" onClick={this.idImagesOnClickHandler}>Image by ID</button>
+
+                <form>
+                    <label>Team ID</label>
+                    <input type="text" onChange={this.idTeamsOnChangeHandler}/>
+                    
+                    <label>Image ID</label>
+                    <input type="text" onChange={this.idImagesOnChangeHandler}/>
                 </form>
             </div>
         )

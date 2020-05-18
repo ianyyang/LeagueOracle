@@ -60,6 +60,7 @@ app.get('/images', (req, res) => {
         .then(images => res.json(images))
         .catch(err => res.status(400).json('Error: ' + err));
 });
+
 // GET: specific uploaded image
 app.get('/images/:id', (req, res) => {
     Image.findById(req.params.id)
@@ -111,8 +112,8 @@ app.post('/upload', (req, res) => {
         }
 
         processImage()
-            // Save teams to database
             .then(() => {
+                // Save teams to database
                 var data = raw[0].split('\n');
                 var user = [];
                 var opp = [];
@@ -129,33 +130,36 @@ app.post('/upload', (req, res) => {
                 });
 
                 newTeams.save()
-                    .then(() => { console.log('Teams added to the database successfully'); })
-                    .catch(err => {
-                        console.error(err);
-                    })
-            })
-            // Save image to database
-            .then(() => {
-                var image = fs.readFileSync('./uploads/crop final.png').toString('base64');
-                var newImage = new Image({
-                    originalName: req.file.originalname,
-                    modifiedName: req.file.filename,
-                    type: req.file.mimetype,
-                    size: req.file.size,
-                    width: dimensions.width,
-                    height: dimensions.height,
-                    data: new Buffer.from(image, 'base64')
-                });
+                    .then(() => console.log('Teams added to the database successfully'))
+                    .then(() => {
+                        // Save image to database
+                        var image = fs.readFileSync('./uploads/crop final.png').toString('base64');
+                        var newImage = new Image({
+                            originalName: req.file.originalname,
+                            modifiedName: req.file.filename,
+                            type: req.file.mimetype,
+                            size: req.file.size,
+                            width: dimensions.width,
+                            height: dimensions.height,
+                            data: new Buffer.from(image, 'base64')
+                        });
 
-                newImage.save()
-                    .then(() => { console.log('Image added to the database successfully'); })
-                    .catch(err => {
-                        console.error(err);
+                        newImage.save()
+                            .then(() => console.log('Image added to the database successfully'))
+                            .then(() => {
+                                // Reset Multer storage
+                                fsExtra.emptyDirSync('./uploads')
+
+                                // Return array of MongoDB IDs
+                                Teams.findOne({ imgName: req.file.filename })
+                                    .then(teams => {
+                                        Image.findOne({ modifiedName: req.file.filename })
+                                            .then(image => { res.send([teams._id, image._id]) })
+                                    })
+                            })
+                            .catch(err => console.error(err))
                     })
-            })
-            .finally(() => {
-                // Reset Multer storage
-                fsExtra.emptyDirSync('./uploads');
+                    .catch(err => { console.error(err) })
             })
             .catch(err => res.status(400).json('Error: ' + err));
     })
@@ -200,6 +204,10 @@ app.post('/upload', (req, res) => {
 
         await worker.terminate();
         console.log('Tesseract.js image processing completed');
+    }
+
+    function saveTeamsAndImage() {
+
     }
 })
 
