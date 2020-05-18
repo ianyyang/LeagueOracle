@@ -8,6 +8,7 @@ var fs = require('fs');
 var sizeOf = require('image-size');
 var jimp = require('jimp');
 var { createWorker } = require('tesseract.js');
+var fsExtra = require('fs-extra');
 
 // Declarations
 var app = express();
@@ -30,13 +31,14 @@ var storage = multer.diskStorage({
 var upload = multer({ storage: storage }).single('file');
 
 // MongoDB Atlas & Mongoose
-// var Image = require('./models/image.model');
-// var uri = process.env.ATLAS_URI;
-// mongoose.connect(uri, { useNewUrlParser: true, useCreateIndex: true, useUnifiedTopology: true });
-// var connection = mongoose.connection;
-// connection.once('open', () => {
-//     console.log("MongoDB database connection established successfully");
-// })
+var Image = require('./models/image.model');
+var Teams = require('./models/teams.model');
+var uri = process.env.ATLAS_URI;
+mongoose.connect(uri, { useNewUrlParser: true, useCreateIndex: true, useUnifiedTopology: true });
+var connection = mongoose.connection;
+connection.once('open', () => {
+    console.log("MongoDB database connection established successfully");
+})
 
 // GET: all previous queries (todo)
 app.get('/', (req, res) => {
@@ -48,84 +50,97 @@ app.get('/:id', (req, res) => {
     return res.send('Hello');
 });
 
-// POST: Process image then store image, image data, and Tesseract.js results in database
+// POST: Tesseract.js image results
 app.post('/upload', (req, res) => {
     // Upload to Multer storage
     upload(req, res, (err) => {
-        // Setting up Tesseract.js data
+        // Set up Tesseract.js data
         var raw = [];
 
-        // Setting up crop parameters (See: Prototype Reference)
+        // Set up and store Mongoose image schema
         var dimensions = sizeOf(`./uploads/${req.file.filename}`);
-        // Width: champion/player name
-        var crop_w = dimensions.width * 0.125521;
-        // Height: champion and player name
-        var crop_h = [];
-        for (let i = 0; i < 10; i++) {
-            crop_h.push(dimensions.height * 0.023148, dimensions.height * 0.020370);
-        };
-        // X: two rows of five champion and player name pairs
-        var crop_x = [dimensions.width * 0.138021, dimensions.width * 0.138021];
-        for (let i = 0; i < 4; i++) {
-            crop_x.push(crop_x[crop_x.length - 1] + (dimensions.width * 0.150000),
-                crop_x[crop_x.length - 1] + (dimensions.width * 0.150000));
-        }
-        for (let i = 0; i < 5; i++) {
-            crop_x.push(crop_x[i * 2], crop_x[i * 2]);
-        }
-        // Y: one column of one champion and player name pairs
-        var crop_y = [dimensions.height * 0.375926, dimensions.height * (0.375926 + 0.073148)];
-        for (let i = 0; i < 4; i++) {
-            crop_y.push(crop_y[0], crop_y[1]);
-        }
-        for (let i = 0; i < 5; i++) {
-            crop_y.push(crop_y[0] + (dimensions.height * 0.499074), crop_y[1] + (dimensions.height * 0.499074));
-        }
 
         // Process Image: Edit, crop, compose, and Tesseract.js the image
         async function processImage() {
+            // Setting up crop parameters (See: Prototype Reference)
+            var crop_w = dimensions.width * 0.125521;
+            var crop_h = [];
+            for (let i = 0; i < 10; i++) { crop_h.push(dimensions.height * 0.023148, dimensions.height * 0.020370) };
+            var crop_x = [dimensions.width * 0.138021, dimensions.width * 0.138021];
+            for (let i = 0; i < 4; i++) { crop_x.push(crop_x[crop_x.length - 1] + (dimensions.width * 0.150000), crop_x[crop_x.length - 1] + (dimensions.width * 0.150000)); }
+            for (let i = 0; i < 5; i++) { crop_x.push(crop_x[i * 2], crop_x[i * 2]); }
+            var crop_y = [dimensions.height * 0.375926, dimensions.height * (0.375926 + 0.073148)];
+            for (let i = 0; i < 4; i++) { crop_y.push(crop_y[0], crop_y[1]); }
+            for (let i = 0; i < 5; i++) { crop_y.push(crop_y[0] + (dimensions.height * 0.499074), crop_y[1] + (dimensions.height * 0.499074)); }
+
+            // Pre-process image
             await editImage(`./uploads/${req.file.filename}`);
 
+            // Crop images to extract Tesseract.js inputs
             for (let i = 0; i < crop_x.length; i++) {
-                await cropImage('./uploads/processing/composite.png', i + 1, crop_x[i], crop_y[i], crop_w, crop_h[i]);
+                await cropImage('./uploads/composite.png', i + 1, crop_x[i], crop_y[i], crop_w, crop_h[i]);
             };
 
+            // Composite all images together
             var height = 0;
             for (let i = 0; i < crop_x.length; i++) {
-                await composeImage('./uploads/processing/composite.png', `./uploads/processing/crop ${i + 1}.png`, 0, height);
+                await composeImage('./uploads/composite.png', `./uploads/crop ${i + 1}.png`, 0, height);
                 height += crop_h[i];
             };
 
-            await cropImage('./uploads/processing/composite.png', '', 0, 0, crop_w, (crop_h[0] * 10) + (crop_h[1] * 10));
+            await cropImage('./uploads/composite.png', 'final', 0, 0, crop_w, (crop_h[0] * 10) + (crop_h[1] * 10))
 
-            await recognizeImage('./uploads/processing/crop .png', raw);
+            await recognizeImage('./uploads/crop final.png', raw);
         }
 
-        processImage();
+        processImage()
+            // Save teams to database
+            .then(() => {
+                var data = raw[0].split('\n');
+                var user = [];
+                var opp = [];
 
-        res.send(raw);
+                for (let i = 0; i < Math.floor(data.length / 4); i++) {
+                    opp.push([data[i * 2], data[(i * 2) + 1]])
+                    user.push([data[(i * 2) + 10], data[(i * 2) + 11]])
+                }
 
-        // // Set up Mongoose image schema
-        // var image = fs.readFileSync(req.file.path);
-        // var encode_image = image.toString('base64');
-        // var newImage = new Image({
-        //     originalName: req.file.originalname,
-        //     modifiedName: req.file.filename,
-        //     type: req.file.mimetype,
-        //     size: req.file.size,
-        //     width: dimensions.width,
-        //     height: dimensions.height,
-        //     data: new Buffer.from(encode_image, 'base64')
-        // });
+                var newTeams = new Teams({
+                    imgName: req.file.filename,
+                    userTeam: user,
+                    oppTeam: opp
+                });
 
-        // // Save Mongoose image schema to database
-        // newImage.save()
-        //     .then(() => {
-        //         res.send('Image added to the database');
-        //     })
-        //     .catch(err => {
-        //         console.error(err);
-        //     })
+                newTeams.save()
+                    .then(() => { console.log('Teams added to the database successfully'); })
+                    .catch(err => {
+                        console.error(err);
+                    })
+            })
+            // Save image to database
+            .then(() => {
+                var image = fs.readFileSync('./uploads/crop final.png').toString('base64');
+                var newImage = new Image({
+                    originalName: req.file.originalname,
+                    modifiedName: req.file.filename,
+                    type: req.file.mimetype,
+                    size: req.file.size,
+                    width: dimensions.width,
+                    height: dimensions.height,
+                    data: new Buffer.from(image, 'base64')
+                });
+
+                newImage.save()
+                    .then(() => { console.log('Image added to the database successfully'); })
+                    .catch(err => {
+                        console.error(err);
+                    })
+            })
+            .finally(() => {
+                // Reset Multer storage
+                fsExtra.emptyDirSync('./uploads');
+            })
+            .catch(err => res.status(400).json('Error: ' + err));
     })
 })
 
@@ -134,11 +149,10 @@ async function editImage(img) {
     const image = await jimp.read(img);
     image.greyscale().contrast(+0.15).normalize().invert();
 
-    const processed = image.writeAsync('./uploads/processing/processed.png');
-    const composite = image.writeAsync('./uploads/processing/composite.png');
+    const processed = image.writeAsync('./uploads/processed.png');
+    const composite = image.writeAsync('./uploads/composite.png');
     await processed;
     await composite;
-    console.log('Image editing completed');
 }
 
 // Image cropping via Jimp
@@ -146,8 +160,7 @@ async function cropImage(img, i, x, y, w, h) {
     const image = await jimp.read(img);
     image.crop(x, y, w, h);
 
-    await image.writeAsync(`./uploads/processing/crop ${i}.png`);
-    console.log('Image cropping completed');
+    await image.writeAsync(`./uploads/crop ${i}.png`);
 }
 
 // Image composition via Jimp
@@ -157,21 +170,20 @@ async function composeImage(img1, img2, x, y) {
     image1.composite(image2, x, y);
 
     await image1.writeAsync(img1);
-    console.log('Image composition completed');
 }
 
 // Tesseract.js image processing
-async function recognizeImage(img, data) {
+async function recognizeImage(img, raw) {
     const worker = createWorker();
     await worker.load();
     await worker.loadLanguage('eng');
     await worker.initialize('eng');
 
     const { data: { text } } = await worker.recognize(img);
-    data.push(text);
-    console.log(text);
+    raw.push(text);
 
     await worker.terminate();
+    console.log('Tesseract.js image processing completed');
 }
 
 // Server start
