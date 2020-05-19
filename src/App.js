@@ -10,14 +10,22 @@ class App extends Component {
             maxSize: 5000000,
             validTypes: ['image/png', 'image/jpeg', 'image/jpg'],
             selectedFile: null,
-            loaded: 0,
             data: '',
-            teamID: '',
-            imageID: '',
             teams: [],
             images: [],
-            team: [],
-            image: []
+            // team: [],
+            image: [],
+            team: { "_id": "5ec3525163343b031e258ae3", "imgName": "1589858861794 - All Unflipped (1920 x 1080).png", "userTeam": [["Riven", "peerin"], ["Skarner", "malaise //zzz"], ["Steel Legion Garen", "KeyLimePies 12Yrs"], ["Sona", "PrinceTiff"], ["Pyke", "GioGio Reference 3ES"]], "oppTeam": [["Snow Day Graves", "poro want up up MLGB("], ["Ahri", "rAjAnsel"], ["Veigar", "CHNmissplaying"], ["SSG Xayah", "Fzz"], ["Fiddlesticks", "Camille Lily"]], "createdAt": "2020-05-19T03:28:17.041Z", "updatedAt": "2020-05-19T03:28:17.041Z", "__v": 0 }
+        }
+    }
+
+    // Fetch all team and image data
+    componentWillMount = () => {
+        if ((this.state.teams.length + this.state.images.length) === 0) {
+            axios.get("http://localhost:5000/teams")
+                .then(res => { this.setState({ teams: res.data }) })
+            axios.get("http://localhost:5000/images")
+                .then(res => { this.setState({ images: res.data }) })
         }
     }
 
@@ -73,68 +81,105 @@ class App extends Component {
     }
 
     // onClick handler for upload file button
-    uploadFileOnClickHandler = (event) => {
-        const data = new FormData()
-        data.append('file', this.state.selectedFile)
-        axios.post("http://localhost:5000/upload", data)
-            .then(res => { this.setState({ data: res }) })
+    uploadFileOnClickHandler = () => {
+        if (this.state.selectedFile) {
+            const data = new FormData()
+            data.append('file', this.state.selectedFile)
+            axios.post("http://localhost:5000/upload", data)
+                .then(res => {
+                    this.setState({
+                        data: res.data
+                    }, () => {
+                        axios.get("http://localhost:5000/teams/" + this.state.data[0])
+                            .then(res => { this.setState({ team: res.data }) })
+                        axios.get("http://localhost:5000/images/" + this.state.data[1])
+                            .then(res => { this.setState({ image: res.data }) })
+                    })
+                })
+        }
     }
 
-    // onClick handler for all teams button
-    allTeamsOnClickHandler = (event) => {
-        axios.post("http://localhost:5000/teams")
-            .then(res => { this.setState({ teams: res }) })
+    // Display all teams
+    displayAllTeams = () => {
+        const allTeams = this.state.teams.map((team) => {
+            const userTeam = team.userTeam.map((userPlayer) =>
+                <div className="userPlayer">
+                    <li>{userPlayer[1]} ({userPlayer[0]})</li>
+                </div>
+            )
+
+            const oppTeam = team.oppTeam.map((oppPlayer) =>
+                <div className="oppPlayer">
+                    <li>{oppPlayer[1]} ({oppPlayer[0]})</li>
+                </div>
+            )
+
+            return (
+                <div className="userTeam oppTeam">
+                    Game
+                    <ul>
+                        Your Team:
+                        <ul>{userTeam}</ul>
+
+                        Enemy Team:
+                        <ul>{oppTeam}</ul>
+                    </ul>
+                </div>
+            )
+        })
+
+        return (
+            <div className="allTeams">
+                {allTeams}
+            </div>
+        )
     }
 
-    // onClick handler for all images button
-    allImagesOnClickHandler = (event) => {
-        axios.get("http://localhost:5000/images")
-            .then(res => { this.setState({ images: res }) })
-    }
+    conditionalRender = () => {
+        if (this.state.data === '' || this.state.team.length === 0) {
+            return (
+                <div>
+                    <form action="#" method="POST" enctype="multipart/form-data">
+                        <input type="file" name="file" onChange={this.chooseFileOnChangeHandler} />
+                        <br />
+                        <button type="button" onClick={this.uploadFileOnClickHandler}>Upload</button>
+                    </form>
 
-    // onClick handler for specific team button
-    idTeamsOnClickHandler = (event) => {
-        axios.post("http://localhost:5000/teams/", { _id: this.state.teamID })
-            .then(res => { this.setState({ team: res }) })
-    }
+                    Previous History:
+                    { this.displayAllTeams()}
+                </div>
+            )
+        } else {
+            const userTeam = this.state.team.userTeam.map((userPlayer) =>
+                <div className="userPlayer">
+                    <li>{userPlayer[1]} ({userPlayer[0]})</li>
+                </div>
+            )
 
-    // onClick handler for specific image button
-    idImagesOnClickHandler = (event) => {
-        axios.get("http://localhost:5000/images/", { _id: this.state.imageID })
-            .then(res => { this.setState({ image: res }) })
-    }
+            const oppTeam = this.state.team.oppTeam.map((oppPlayer) =>
+                <div className="oppPlayer">
+                    <li>{oppPlayer[1]} ({oppPlayer[0]})</li>
+                </div>
+            )
 
-    // onChange handler for specific team input
-    idTeamsOnChangeHandler = (event) => {
-        this.setState({ teamID: event.target.value })
-    }
+            return (
+                <div className="userTeam oppTeam">
+                    <ul>
+                        Your Team:
+                        <ul>{userTeam}</ul>
 
-    // onChange handler for specific image input
-    idImagesOnChangeHandler = (event) => {
-        this.setState({ imageID: event.target.value })
+                        Enemy Team:
+                        <ul>{oppTeam}</ul>
+                    </ul>
+                </div>
+            )
+        }
     }
 
     render() {
         return (
             <div>
-                <form action="#" method="POST" enctype="multipart/form-data">
-                    <input type="file" name="file" onChange={this.chooseFileOnChangeHandler} />
-                    <button type="button" onClick={this.uploadFileOnClickHandler}>Upload</button>
-                </form>
-
-                <button type="button" onClick={this.allTeamsOnClickHandler}>All Teams</button>
-                <button type="button" onClick={this.allImagesOnClickHandler}>All Images</button>
-
-                <button type="button" onClick={this.idTeamsOnClickHandler}>Team by ID</button>
-                <button type="button" onClick={this.idImagesOnClickHandler}>Image by ID</button>
-
-                <form>
-                    <label>Team ID</label>
-                    <input type="text" onChange={this.idTeamsOnChangeHandler}/>
-                    
-                    <label>Image ID</label>
-                    <input type="text" onChange={this.idImagesOnChangeHandler}/>
-                </form>
+                {this.conditionalRender()}
             </div>
         )
     }
