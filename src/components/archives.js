@@ -5,6 +5,9 @@ import axios from 'axios';
 // CSS
 import './../styles/css/archives.css';
 
+// Material UI
+import Box from '@material-ui/core/Box';
+
 class Archives extends Component {
     constructor(props) {
         super(props);
@@ -32,33 +35,34 @@ class Archives extends Component {
     displayAllTeams() {
         const allTeams = this.state.teams.map((team) => {
             const userTeam = team.userTeam.map((userPlayer) =>
-                <div key={userPlayer.id} className="userPlayer">
+                <div className="user-player">
                     <li>{userPlayer[1]} ({userPlayer[0]})</li>
                 </div>,
             );
 
             const oppTeam = team.oppTeam.map((oppPlayer) =>
-                <div key={oppPlayer.id} className="oppPlayer">
+                <div className="opp-player">
                     <li>{oppPlayer[1]} ({oppPlayer[0]})</li>
                 </div>,
             );
 
             return (
-                <div key={team.id} className="userTeam oppTeam">
-                    Game
-                    <ul>
-                        Your Team:
-                        <ul>{userTeam}</ul>
+                <div className="user-team opp-team">
+                    <Box display="flex" justifyContent="center" m={1} p={1}>
+                        <Box p={1} bgcolor="grey.400">
+                            <ul>{userTeam}</ul>
+                        </Box>
 
-                            Enemy Team:
-                        <ul>{oppTeam}</ul>
-                    </ul>
+                        <Box p={1} bgcolor="grey.400">
+                            <ul>{oppTeam}</ul>
+                        </Box>
+                    </Box>
                 </div>
             );
         });
 
         return (
-            <div className="allTeams">
+            <div className="all-teams" >
                 {allTeams}
             </div>
         );

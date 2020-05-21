@@ -1,9 +1,13 @@
 // Imports
-import React, {Component} from 'react';
+import React, { Component } from 'react';
 import axios from 'axios';
 
 // CSS
 import './../styles/css/uploads.css';
+
+// Material UI
+import Box from '@material-ui/core/Box';
+import Button from '@material-ui/core/Button';
 
 class Uploads extends Component {
     constructor(props) {
@@ -11,7 +15,6 @@ class Uploads extends Component {
         this.state = {
             maxSize: 5000000,
             validTypes: ['image/png', 'image/jpeg', 'image/jpg'],
-            selectedFile: null,
             data: '',
             team: [],
             image: [],
@@ -19,7 +22,7 @@ class Uploads extends Component {
     }
 
     // Check if the upload follows proper file size limits
-    checkFileSize(event) {
+    checkFileSize = (event) => {
         const files = event.target.files;
         let err = '';
 
@@ -39,7 +42,7 @@ class Uploads extends Component {
     }
 
     // Check if the upload follows proper file types
-    checkFileType(event) {
+    checkFileType = (event) => {
         const files = event.target.files;
         let err = '';
 
@@ -58,22 +61,13 @@ class Uploads extends Component {
         return true;
     }
 
-    // onChange handler for choosing files
-    chooseFileOnChangeHandler(event) {
+    // onChange handler for upload
+    uploadOnChangeHandler = (event) => {
         const files = event.target.files;
 
         if (this.checkFileSize(event) && this.checkFileType(event)) {
-            this.setState({
-                selectedFile: files[0],
-            });
-        }
-    }
-
-    // onClick handler for upload file button
-    uploadFileOnClickHandler() {
-        if (this.state.selectedFile) {
             const data = new FormData();
-            data.append('file', this.state.selectedFile);
+            data.append('file', files[0]);
             axios.post('http://localhost:5000/upload', data)
                 .then((res) => {
                     this.setState({
@@ -81,50 +75,62 @@ class Uploads extends Component {
                     }, () => {
                         axios.get('http://localhost:5000/teams/' + this.state.data[0])
                             .then((res) => {
-                                this.setState({team: res.data});
+                                this.setState({ team: res.data });
                             });
                         axios.get('http://localhost:5000/images/' + this.state.data[1])
                             .then((res) => {
-                                this.setState({image: res.data});
+                                this.setState({ image: res.data });
                             });
                     });
                 });
         }
     }
 
-    conditionalRender() {
+    conditionalRender = () => {
         if (this.state.data === '' || this.state.team.length === 0) {
             return (
-                <div>
-                    <form action="#" method="POST" encType="multipart/form-data">
-                        <input type="file" className="fileUpload" onChange={this.chooseFileOnChangeHandler} />
-                        <br />
-                        <button type="button" onClick={this.uploadFileOnClickHandler}>Upload</button>
-                    </form>
+                <div className="header">
+                    <div className="title">
+                        <Box display="flex" justifyContent="center" m={1} p={1}>
+                            <h1>League Oracle</h1>
+                        </Box>
+                    </div>
+                    <div className="upload">
+                        <Box display="flex" justifyContent="center" m={1} p={1}>
+                            <form action="#" method="POST" encType="multipart/form-data">
+                                <Button size="large" variant="contained" color="secondary" disableElevation component="label">
+                                    Upload Image
+                                    <input type="file" accept="image/*" style={{ display: "none" }} onChange={this.uploadOnChangeHandler} />
+                                </Button>
+                            </form>
+                        </Box>
+                    </div>
                 </div>
             );
         } else {
             const userTeam = this.state.team.userTeam.map((userPlayer) =>
-                <div key={userPlayer.id} className="userPlayer">
+                <div className="user-player">
                     <li>{userPlayer[1]} ({userPlayer[0]})</li>
                 </div>,
             );
 
             const oppTeam = this.state.team.oppTeam.map((oppPlayer) =>
-                <div key={oppPlayer.id} className="oppPlayer">
+                <div className="opp-player">
                     <li>{oppPlayer[1]} ({oppPlayer[0]})</li>
                 </div>,
             );
 
             return (
-                <div className="userTeam oppTeam">
-                    <ul>
-                        Your Team:
-                        <ul>{userTeam}</ul>
+                <div className="user-team opp-team">
+                    <Box display="flex" justifyContent="center" m={1} p={1}>
+                        <Box p={1} bgcolor="grey.400">
+                            <ul>{userTeam}</ul>
+                        </Box>
 
-                        Enemy Team:
-                        <ul>{oppTeam}</ul>
-                    </ul>
+                        <Box p={1} bgcolor="grey.400">
+                            <ul>{oppTeam}</ul>
+                        </Box>
+                    </Box>
                 </div>
             );
         }
