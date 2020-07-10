@@ -1,7 +1,7 @@
 ## What is League Oracle? 🎮🔍
 League Oracle is a statistical analysis tool meant to be used in conjunction of a live League of Legends game, specifically focusing on the Summoner's Rift game mode. Players can freely screenshot their in-game loading screen, input it into League Oracle, and receive a whole ton of useful data pertaining to their match: the Summoners, the Champions, and everything in between. 
 
-A great player is able to observe key information during the game, as it happens, and utilize it in order to optimize their gameplay strategies. League Oracle provides you with vital pre-game information regarding your teammates, the enemy team, among other things, so you can leverage it to get clinch that next promotion closer to the ever ellusive Challenger ranking.
+A great player is able to observe key information during the game, as it happens, and utilize it in order to optimize their gameplay strategies. League Oracle provides you with vital pre-game information regarding your teammates, the enemy team, among other things, so you can leverage it to get clinch that next promotion closer to the ever elusive Challenger ranking.
 
 ## The Technical Details
 **Technologies Used: React.js, Node.js, Express.js, MongoDB, Tesseract OCR Engine, Riot Games API**
